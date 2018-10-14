@@ -1,7 +1,6 @@
 package render
 
 import (
-	"io/ioutil"
 	"time"
 
 	"github.com/aestek/baleno/keymap"
@@ -11,18 +10,17 @@ import (
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/pixelgl"
 	"github.com/faiface/pixel/text"
-	"github.com/golang/freetype/truetype"
 	"golang.org/x/image/colornames"
-	"golang.org/x/image/font"
 )
 
 type Renderer struct {
-	Config     Config
-	win        *pixelgl.Window
-	txt        *text.Text
-	imd        *imdraw.IMDraw
-	keyPresses chan keymap.KeyPress
-	drawQueue  []func()
+	Config         Config
+	win            *pixelgl.Window
+	txt            *text.Text
+	imd            *imdraw.IMDraw
+	keyPresses     chan keymap.KeyPress
+	drawQueue      []func()
+	blockH, blockW float64
 }
 
 func NewRenderer(cfg Config) *Renderer {
@@ -41,7 +39,7 @@ func NewRenderer(cfg Config) *Renderer {
 		panic(err)
 	}
 
-	fontSize := 14.0
+	fontSize := 30.0
 
 	font := loadFont(renderer.Config.FontPath, fontSize)
 	atlas := text.NewAtlas(font, text.ASCII)
@@ -52,6 +50,8 @@ func NewRenderer(cfg Config) *Renderer {
 	renderer.win = win
 	renderer.txt = txt
 	renderer.imd = imdraw.New(nil)
+	renderer.blockH = fontSize
+	renderer.blockW = txt.BoundsOf("A").W()
 
 	return renderer
 }
@@ -74,34 +74,4 @@ func (r *Renderer) Run() {
 
 		<-fps
 	}
-}
-
-func (r *Renderer) Drawer() *Drawer {
-	return &Drawer{
-		win:        r.win,
-		txt:        r.txt,
-		imd:        r.imd,
-		keyPresses: r.keyPresses,
-		blockH:     14.0,
-		blockW:     14.0,
-		addToQueue: func(fn func()) {
-			r.drawQueue = append(r.drawQueue, fn)
-		},
-	}
-}
-
-func loadFont(path string, fontSize float64) font.Face {
-	c, err := ioutil.ReadFile(path)
-	if err != nil {
-		panic(err)
-	}
-
-	ttf, err := truetype.Parse(c)
-	if err != nil {
-		panic(err)
-	}
-	face := truetype.NewFace(ttf, &truetype.Options{
-		Size: 14,
-	})
-	return face
 }

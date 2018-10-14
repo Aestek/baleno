@@ -6,5 +6,5 @@ type Buffer interface {
 	Delete(at int, n int) error
 	Length() int
 	ReadOnly() bool
-	Index(search string) []int
+	Index(IndexDef) []int
 }

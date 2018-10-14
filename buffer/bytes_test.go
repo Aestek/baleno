@@ -53,7 +53,7 @@ func TestLineLength(t *testing.T) {
 		assert.Nil(t, err)
 
 		for i := 0; i < b.LineCount(); i++ {
-			assert.Equal(t, c.exp[i], b.LineLength(i))
+			assert.Equal(t, c.exp[i], b.LineLength(i), "%+v, line %d", c, i)
 		}
 	}
 }

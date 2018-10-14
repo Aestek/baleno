@@ -74,7 +74,7 @@ func TestCursor(t *testing.T) {
 		{
 			in:       "Hello\naaa",
 			advanceX: 1,
-			initial:  Cursor{0, 5},
+			initial:  Cursor{5, 0},
 			expected: Cursor{0, 1},
 		},
 		{

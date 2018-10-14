@@ -2,15 +2,31 @@ package buffer
 
 import "sync"
 
-type Index struct {
-	seq       []rune
-	positions []int
-	lock      sync.RWMutex
+var StartOfLineIdx = IndexDef{
+	Search:     "\n",
+	After:      true,
+	ForceFirst: true,
 }
 
-func NewIndex(seq []rune, c []rune) *Index {
+var EndOfLineIdx = IndexDef{
+	Search: "\n",
+}
+
+type IndexDef struct {
+	Search     string
+	After      bool
+	ForceFirst bool
+}
+
+type Index struct {
+	positions []int
+	lock      sync.RWMutex
+	def       IndexDef
+}
+
+func NewIndex(def IndexDef, c []rune) *Index {
 	i := &Index{
-		seq: seq,
+		def: def,
 	}
 	i.Build(c, 0, len(c))
 	return i
@@ -20,10 +36,15 @@ func (idx *Index) Build(c []rune, from, to int) {
 	idx.lock.Lock()
 	defer idx.lock.Unlock()
 
+	seq := []rune(idx.def.Search)
 	idx.positions = []int{}
+	if idx.def.ForceFirst {
+		idx.positions = append(idx.positions, 0)
+	}
+
 Next:
 	for i := from; i < to; i++ {
-		for j, r := range idx.seq {
+		for j, r := range seq {
 			if i+j >= to {
 				return
 			}
@@ -32,7 +53,11 @@ Next:
 				continue Next
 			}
 		}
-		idx.positions = append(idx.positions, i)
+		pos := i
+		if idx.def.After {
+			pos++
+		}
+		idx.positions = append(idx.positions, pos)
 	}
 }
 

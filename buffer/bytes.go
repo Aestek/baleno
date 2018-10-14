@@ -14,7 +14,7 @@ var ErrOutOfRange = fmt.Errorf("out of range")
 type Bytes struct {
 	contents    []rune
 	indexesLock sync.Mutex
-	indexes     map[string]*Index
+	indexes     map[IndexDef]*Index
 }
 
 func NewBytes(b io.Reader, enc *UTF8Encoding) (*Bytes, error) {
@@ -27,7 +27,7 @@ func NewBytes(b io.Reader, enc *UTF8Encoding) (*Bytes, error) {
 
 	return &Bytes{
 		contents: runes,
-		indexes:  map[string]*Index{},
+		indexes:  map[IndexDef]*Index{},
 	}, nil
 }
 
@@ -79,43 +79,36 @@ func (b *Bytes) Length() int {
 	return len(b.contents)
 }
 
-func (b *Bytes) Index(search string) []int {
+func (b *Bytes) Index(def IndexDef) []int {
 	b.indexesLock.Lock()
 	defer b.indexesLock.Unlock()
-	_, ok := b.indexes[search]
+	_, ok := b.indexes[def]
 	if !ok {
-		b.indexes[search] = NewIndex([]rune(search), b.contents)
+		b.indexes[def] = NewIndex(def, b.contents)
 	}
-	return b.indexes[search].Entries()
+	return b.indexes[def].Entries()
 }
 
 func (b *Bytes) LineCount() int {
-	return len(b.Index("\n")) + 1
+	return len(b.Index(StartOfLineIdx))
 }
 
 func (b *Bytes) LineLength(n int) int {
-	idx := b.Index("\n")
-	lc := b.LineCount()
-	if lc == 1 && n != 0 {
-		return 0
-	}
-	if lc == 1 {
+	idx := b.Index(StartOfLineIdx)
+
+	if n == 0 && len(idx) == 1 {
 		return len(b.contents)
 	}
-	if n == 0 {
-		return idx[0]
+
+	if n == len(idx)-1 {
+		return len(b.contents) - idx[len(idx)-1]
 	}
-	if n == len(idx) {
-		return len(b.contents) - 1 - idx[len(idx)-1]
-	}
-	if n > len(idx) {
-		return 0
-	}
-	return idx[n] - 1 - idx[n-1]
+
+	return idx[n+1] - idx[n] - 1
 }
 
 func (b *Bytes) buildIndexes() {
 	for _, i := range b.indexes {
-		go i.Build(b.contents, 0, len(b.contents))
+		i.Build(b.contents, 0, len(b.contents))
 	}
 }

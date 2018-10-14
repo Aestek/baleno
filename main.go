@@ -26,7 +26,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		v := view.NewBuffer(b, r.Drawer(), 10, 10)
+		v := view.NewBuffer(b, r, 1000, 1000)
 		v.Draw()
 
 		r.Run()

@@ -49,61 +49,62 @@ func NewBuffer(b *buffer.Bytes, d Drawer, w, h int) *BufferView {
 }
 
 func (v *BufferView) Draw() {
-	contents, err := v.buffer.Read(0, -1)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
 	v.drawer.Do(func() {
-		lines(contents, func(ln int, line []rune) bool {
-			if ln < v.line {
-				return true
-			}
-			if ln > v.line+v.height {
-				return false
-			}
+		idx := v.buffer.Index(buffer.StartOfLineIdx)
+		contents, err := v.buffer.Read(0, -1)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		if len(idx) == 0 {
+			return
+		}
 
-			if v.cursor.Y == ln {
-				x := v.cursor.X
-				if x > len(line) {
-					x = len(line)
-				}
-
-				dx := x - v.col
-				if dx >= 0 && dx < v.width {
-					v.drawer.DrawCursor(x, ln-v.line)
-				}
-			}
-
-			if v.col >= len(line) {
-				return true
-			}
-			until := v.col + v.width
-			if until > len(line) {
-				until = len(line)
-			}
-
-			for i, c := range line[v.col:until] {
-				v.drawer.DrawChar(i, ln-v.line, c)
-			}
-
-			return true
-		})
+		for i := 0; i < len(idx)-1; i++ {
+			line := contents[idx[i]:idx[i+1]]
+			v.drawLine(line, i)
+		}
+		v.drawLine(contents[idx[len(idx)-1]:], len(idx)-1)
 	})
 }
 
-func (b *BufferView) Buffer() buffer.Buffer {
-	return b.buffer
+func (v *BufferView) drawLine(line []rune, ln int) {
+	if v.cursor.Y == ln {
+		x := v.cursor.X
+		if x > len(line) {
+			x = len(line)
+		}
+
+		dx := x - v.col
+		if dx >= 0 && dx < v.width {
+			v.drawer.DrawCursor(x, ln-v.line)
+		}
+	}
+
+	if v.col >= len(line) {
+		return
+	}
+	until := v.col + v.width
+	if until > len(line) {
+		until = len(line)
+	}
+
+	for i, c := range line[v.col:until] {
+		v.drawer.DrawChar(i, ln-v.line, c)
+	}
 }
 
-func (b *BufferView) Cursor() Cursor {
-	return b.cursor
+func (v *BufferView) Buffer() buffer.Buffer {
+	return v.buffer
 }
 
-func (b *BufferView) CursorAdvance(x, y int) {
-	cx, cy := b.cursorReal()
-	lc := b.buffer.LineCount()
+func (v *BufferView) Cursor() Cursor {
+	return v.cursor
+}
+
+func (v *BufferView) CursorAdvance(x, y int) {
+	cx, cy := v.cursorReal()
+	lc := v.buffer.LineCount()
 
 	if x != 0 {
 		for cx+x < 0 {
@@ -114,87 +115,84 @@ func (b *BufferView) CursorAdvance(x, y int) {
 			}
 			x += cx + 1
 			cy--
-			cx = b.buffer.LineLength(cy)
+			cx = v.buffer.LineLength(cy)
 		}
 
-		for cx+x > b.buffer.LineLength(cy) {
+		for cx+x > v.buffer.LineLength(cy) {
 			if cy == lc-1 {
-				cx = b.buffer.LineLength(cy)
+				cx = v.buffer.LineLength(cy)
 				x = 0
 				break
 			}
-			x -= b.buffer.LineLength(cy) - cx + 1
+			x -= v.buffer.LineLength(cy) - cx + 1
 			cy++
 			cx = 0
 		}
 
-		b.cursor.X = cx + x
+		v.cursor.X = cx + x
 	}
 
 	if cy+y < 0 {
-		b.cursor.Y = 0
+		v.cursor.Y = 0
 	} else if cy+y > lc-1 {
-		b.cursor.Y = lc - 1
+		v.cursor.Y = lc - 1
 	} else {
-		b.cursor.Y = cy + y
+		v.cursor.Y = cy + y
 	}
 
-	fmt.Println(b.cursor)
+	fmt.Println(v.cursor)
 }
 
-func (b *BufferView) CursorSetX(x int) {
-	b.cursor.X = x
+func (v *BufferView) CursorSetX(x int) {
+	v.cursor.X = x
 }
 
-func (b *BufferView) CursorSetY(y int) {
-	b.cursor.Y = y
+func (v *BufferView) CursorSetY(y int) {
+	v.cursor.Y = y
 }
 
-func (b *BufferView) CursorOffset() int {
-	x, y := b.cursorReal()
-	if y == 0 {
-		return x
-	}
-	idx := b.buffer.Index(eolIdx)
-	return idx[y-1] + 1 + x
+func (v *BufferView) CursorOffset() int {
+	idx := v.buffer.Index(buffer.StartOfLineIdx)
+
+	x, y := v.cursorReal()
+	return idx[y] + x
 }
 
-func (b *BufferView) OffsetToCursor(n int) (int, int) {
+func (v *BufferView) OffsetToCursor(n int) (int, int) {
+	idx := v.buffer.Index(buffer.StartOfLineIdx)
+
 	y, x := 0, 0
-	idx := b.buffer.Index(eolIdx)
-	lastPos := 0
 	for i, pos := range idx {
-		if n > pos {
-			y = i + 1
-			lastPos = pos + 1
-		} else {
+		if pos > n {
 			break
 		}
+
+		y = i
+		x = n - pos
 	}
-	x = n - lastPos
 	return x, y
 }
 
-func (b *BufferView) DeleteBack(n int) {
-	cp := b.CursorOffset()
+func (v *BufferView) DeleteBack(n int) {
+	cp := v.CursorOffset()
 	if n < 0 {
 		return
 	}
 	if n > cp {
 		n = cp
 	}
-	b.buffer.Delete(cp-n, n)
-	b.cursor.X, b.cursor.Y = b.OffsetToCursor(cp - n)
-	fmt.Println(b.cursor)
+	v.buffer.Delete(cp-n, n)
+	v.cursor.X, v.cursor.Y = v.OffsetToCursor(cp - n)
+	fmt.Println(v.cursor)
 }
 
-func (b *BufferView) cursorReal() (int, int) {
-	x := b.cursor.X
+func (v *BufferView) cursorReal() (int, int) {
+	x := v.cursor.X
 
-	ln := b.buffer.LineLength(b.cursor.Y)
-	if b.cursor.X > ln {
+	ln := v.buffer.LineLength(v.cursor.Y)
+	if v.cursor.X > ln {
 		x = ln
 	}
 
-	return x, b.cursor.Y
+	return x, v.cursor.Y
 }
