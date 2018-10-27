@@ -7,7 +7,7 @@ import (
 	"github.com/faiface/pixel/pixelgl"
 )
 
-func handleKeys(win *pixelgl.Window, up chan keymap.KeyPress) {
+func handleKeys(win *pixelgl.Window) *keymap.KeyPress {
 	typed := win.Typed()
 
 	var key keymap.Key
@@ -29,9 +29,9 @@ func handleKeys(win *pixelgl.Window, up chan keymap.KeyPress) {
 		r, _ := utf8.DecodeRuneInString(typed)
 		key = keymap.Key{Code: keymap.KeyCodeChar, Value: r}
 	default:
-		return
+		return nil
 	}
-	up <- keymap.KeyPress{
+	return &keymap.KeyPress{
 		Key: key,
 	}
 }

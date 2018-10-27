@@ -2,6 +2,7 @@ package render
 
 import (
 	"time"
+	"unicode"
 
 	"github.com/aestek/baleno/keymap"
 
@@ -13,20 +14,27 @@ import (
 	"golang.org/x/image/colornames"
 )
 
+type Drawer interface {
+	DrawCursor(x, y int)
+	DrawChar(x, y int, r rune)
+}
+
+type Renderable interface {
+	Render(Drawer)
+	HandleKeyPress(k keymap.KeyPress)
+}
+
 type Renderer struct {
 	Config         Config
 	win            *pixelgl.Window
 	txt            *text.Text
 	imd            *imdraw.IMDraw
-	keyPresses     chan keymap.KeyPress
-	drawQueue      []func()
 	blockH, blockW float64
 }
 
 func NewRenderer(cfg Config) *Renderer {
 	renderer := &Renderer{
-		Config:     cfg,
-		keyPresses: make(chan keymap.KeyPress),
+		Config: cfg,
 	}
 
 	winCfg := pixelgl.WindowConfig{
@@ -42,7 +50,11 @@ func NewRenderer(cfg Config) *Renderer {
 	fontSize := 30.0
 
 	font := loadFont(renderer.Config.FontPath, fontSize)
-	atlas := text.NewAtlas(font, text.ASCII)
+	atlasRunes := []rune{}
+	for _, r := range unicode.Scripts {
+		atlasRunes = append(atlasRunes, text.RangeTable(r)...)
+	}
+	atlas := text.NewAtlas(font, atlasRunes)
 	txt := text.New(pixel.V(3, 0), atlas)
 
 	txt.Color = colornames.Lightgrey
@@ -56,22 +68,16 @@ func NewRenderer(cfg Config) *Renderer {
 	return renderer
 }
 
-func (r *Renderer) Run() {
+func (r *Renderer) Run(drawable Renderable) {
 	fps := time.Tick(time.Second / 120)
 	for !r.win.Closed() {
-		handleKeys(r.win, r.keyPresses)
-
-		if len(r.drawQueue) > 0 {
-			r.win.Clear(colornames.Ivory)
-			for _, f := range r.drawQueue {
-				f()
-			}
-			r.drawQueue = r.drawQueue[:0]
-			r.win.Update()
-		} else {
-			r.win.UpdateInput()
+		kp := handleKeys(r.win)
+		if kp != nil {
+			drawable.HandleKeyPress(*kp)
 		}
-
+		r.win.Clear(colornames.Ivory)
+		drawable.Render(r)
+		r.win.Update()
 		<-fps
 	}
 }

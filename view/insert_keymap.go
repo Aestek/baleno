@@ -13,7 +13,7 @@ func InsertKeyMap(view *BufferView) *keymap.Node {
 					return k.Key.Code == keymap.KeyCodeChar
 				},
 				Action: func(k keymap.KeyPress) {
-					view.Buffer().Insert(view.CursorOffset(), []rune{k.Key.Value})
+					view.buffer.Insert(view.CursorOffset(), []rune{k.Key.Value})
 					view.CursorAdvance(1, 0)
 				},
 			},
@@ -62,7 +62,7 @@ func InsertKeyMap(view *BufferView) *keymap.Node {
 					return k.Key.Code == keymap.KeyCodeEnter
 				},
 				Action: func(k keymap.KeyPress) {
-					view.Buffer().Insert(view.CursorOffset(), []rune{'\n'})
+					view.buffer.Insert(view.CursorOffset(), []rune{'\n'})
 					view.CursorAdvance(0, 1)
 					view.CursorSetX(0)
 				},

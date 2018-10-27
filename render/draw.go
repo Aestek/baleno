@@ -3,7 +3,6 @@ package render
 import (
 	"golang.org/x/image/colornames"
 
-	"github.com/aestek/baleno/keymap"
 	"github.com/faiface/pixel/imdraw"
 
 	"github.com/faiface/pixel"
@@ -13,10 +12,6 @@ const (
 	cursorMarginRight = 3
 	cursorMarginTop   = 5
 )
-
-func (r *Renderer) Do(fn func()) {
-	r.drawQueue = append(r.drawQueue, fn)
-}
 
 func (r *Renderer) DrawCursor(x, y int) {
 	r.imd.Clear()
@@ -39,10 +34,6 @@ func (r *Renderer) DrawChar(x, y int, c rune) {
 	r.txt.Clear()
 	r.txt.WriteRune(c)
 	r.txt.Draw(r.win, pixel.IM.Moved(r.at(x, y+1)))
-}
-
-func (r *Renderer) KeyPresses() <-chan keymap.KeyPress {
-	return r.keyPresses
 }
 
 func (r *Renderer) at(x, y int) pixel.Vec {

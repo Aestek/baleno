@@ -26,9 +26,12 @@ func main() {
 			log.Fatal(err)
 		}
 
-		v := view.NewBuffer(b, r, 1000, 1000)
+		v := view.NewBuffer(b, 1000, 1000)
 		v.Draw()
 
-		r.Run()
+		pane := view.NewViewPane(v)
+		pane.X = 10
+		pane.Y = 5
+		r.Run(view.NewWindow(pane))
 	})
 }
