@@ -10,7 +10,7 @@ type DrawBlock struct {
 
 func NewDrawBuffer(width, height int) DrawBuffer {
 	b := make(DrawBuffer, height)
-	for i := 0; i < width; i++ {
+	for i := 0; i < height; i++ {
 		b[i] = make([]DrawBlock, width)
 	}
 	return b

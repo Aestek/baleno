@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"log"
 
+	"github.com/aestek/baleno/state"
+	"github.com/aestek/baleno/window"
+
 	"github.com/aestek/baleno/buffer"
 	"github.com/aestek/baleno/render"
 	"github.com/aestek/baleno/view"
@@ -12,6 +15,8 @@ import (
 
 func main() {
 	pixelgl.Run(func() {
+		state := state.New()
+
 		r := render.NewRenderer(
 			render.Config{
 				FontPath: "/home/aestek/.dotfiles/.fonts/Inconsolata-Regular.ttf",
@@ -26,12 +31,10 @@ func main() {
 			log.Fatal(err)
 		}
 
-		v := view.NewBuffer(b, 1000, 1000)
-		v.Draw()
+		win := window.New(state)
+		win.AddView(view.NewStatusView(state))
+		win.AddView(view.NewBuffer(b))
 
-		pane := view.NewViewPane(v)
-		pane.X = 10
-		pane.Y = 5
-		r.Run(view.NewWindow(pane))
+		r.Run(win)
 	})
 }

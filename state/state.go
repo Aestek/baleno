@@ -9,6 +9,7 @@ import (
 type Node struct {
 	Key      string
 	Alias    *Node
+	Aliased  []*Node
 	Value    interface{}
 	Watches  []chan Event
 	Children []*Node
@@ -21,11 +22,14 @@ type Event struct {
 
 type State struct {
 	root *Node
-	lock sync.RWMutex
+	lock *sync.RWMutex
 }
 
 func New() *State {
-	return &State{root: &Node{}}
+	return &State{
+		root: &Node{},
+		lock: &sync.RWMutex{},
+	}
 }
 
 func (s *State) set(k string, v interface{}) *Node {
@@ -43,6 +47,9 @@ Run:
 			n = n.Alias
 		}
 
+		path = append(path, n)
+		path = append(path, n.Aliased...)
+
 		if partIdx == len(parts)-1 {
 			n.Value = v
 			evt := Event{Key: k, Value: v}
@@ -57,7 +64,6 @@ Run:
 			return n
 		} else {
 			node = n
-			path = append(path, n)
 			partIdx++
 			goto Run
 		}
@@ -75,7 +81,7 @@ func (s *State) Set(k string, v interface{}) {
 	s.set(k, v)
 }
 
-func (s *State) getNode(k string) *Node {
+func (s *State) get(k string, followAliases bool) *Node {
 	parts := strings.Split(k, ".")
 	node := s.root
 	partIdx := 0
@@ -85,7 +91,7 @@ Run:
 			continue
 		}
 
-		if n.Alias != nil {
+		if n.Alias != nil && followAliases {
 			n = n.Alias
 		}
 
@@ -104,12 +110,28 @@ func (s *State) Get(k string) (interface{}, bool) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	node := s.getNode(k)
+	node := s.get(k, true)
 	if node == nil {
 		return nil, false
 	}
 
 	return node.Value, node.Value != nil
+}
+
+func (s *State) MustGet(k string) interface{} {
+	v, _ := s.Get(k)
+	return v
+}
+
+func (s *State) Range(k string, cb func(k string, value interface{})) {
+	node := s.get(k, true)
+	if node == nil {
+		return
+	}
+
+	for _, c := range node.Children {
+		cb(c.Key, c.Value)
+	}
 }
 
 func (s *State) Delete(k string) {
@@ -120,17 +142,27 @@ func (s *State) Alias(from string, to string) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	toNode := s.getNode(to)
+	toNode := s.get(to, true)
 	if toNode == nil {
 		return fmt.Errorf("state: alias: target key `%s` does not exist", to)
 	}
 
-	fromNode := s.getNode(from)
+	fromNode := s.get(from, false)
 	if fromNode == nil {
 		fromNode = s.set(from, nil)
+	} else if fromNode.Alias != nil {
+		aliases := fromNode.Alias.Aliased
+		for i := range aliases {
+			if aliases[i] == fromNode {
+				aliases[i], aliases[len(aliases)-1] = aliases[len(aliases)-1], aliases[i]
+				aliases = aliases[:len(aliases)-1]
+				break
+			}
+		}
 	}
 
 	fromNode.Alias = toNode
+	toNode.Aliased = append(toNode.Aliased, fromNode)
 
 	return nil
 }
@@ -139,11 +171,23 @@ func (s *State) Watch(k string, c chan Event) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	node := s.getNode(k)
+	node := s.get(k, false)
 	if node == nil {
 		return fmt.Errorf("state: watch: key `%s` does not exist", k)
 	}
 
 	node.Watches = append(node.Watches, c)
 	return nil
+}
+
+func (s *State) Namespace(k string) *State {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	node := s.get(k, true)
+	if node == nil {
+		node = s.set(k, nil)
+	}
+
+	return &State{root: node, lock: s.lock}
 }

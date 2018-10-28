@@ -5,6 +5,8 @@ type Buffer interface {
 	Insert(at int, contents []rune) error
 	Delete(at int, n int) error
 	Length() int
+	LineCount() int
+	LineLength(n int) int
 	ReadOnly() bool
 	Index(IndexDef) []int
 }

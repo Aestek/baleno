@@ -1,30 +1,27 @@
 package view
 
 import (
-	"fmt"
 	"log"
 	"sync"
 
 	"github.com/aestek/baleno/buffer"
 	"github.com/aestek/baleno/keymap"
+	"github.com/aestek/baleno/state"
 )
 
 type BufferView struct {
 	drawBuffer     DrawBuffer
 	drawBufferLock sync.Mutex
-	buffer         *buffer.Bytes
+	buffer         buffer.Buffer
 	width, height  int
 	line, col      int
-	cursor         Cursor
 	keyMap         *keymap.Node
+	state          *state.State
 }
 
-func NewBuffer(b *buffer.Bytes, w, h int) *BufferView {
+func NewBuffer(b *buffer.Bytes) *BufferView {
 	v := &BufferView{
-		buffer:     b,
-		drawBuffer: NewDrawBuffer(w, h),
-		width:      w,
-		height:     h,
+		buffer: b,
 	}
 
 	v.keyMap = InsertKeyMap(v)
@@ -34,10 +31,10 @@ func NewBuffer(b *buffer.Bytes, w, h int) *BufferView {
 
 func (v *BufferView) HandleKeyPress(k keymap.KeyPress) {
 	v.keyMap.Exec(k)
-	v.Draw()
+	v.draw()
 }
 
-func (v *BufferView) Draw() {
+func (v *BufferView) draw() {
 	v.drawBufferLock.Lock()
 	defer v.drawBufferLock.Unlock()
 
@@ -61,8 +58,8 @@ func (v *BufferView) Draw() {
 }
 
 func (v *BufferView) drawLine(line []rune, ln int) {
-	if v.cursor.Y == ln {
-		x := v.cursor.X
+	if v.CursorY() == ln {
+		x := v.CursorX()
 		if x > len(line) {
 			x = len(line)
 		}
@@ -93,15 +90,15 @@ func (v *BufferView) Buffer() DrawBuffer {
 }
 
 func (v *BufferView) SetSize(w, h int) {
+	if w == v.width && h == v.height {
+		return
+	}
 	v.drawBufferLock.Lock()
+	defer v.draw()
 	defer v.drawBufferLock.Unlock()
 	v.width = w
 	v.height = h
 	v.drawBuffer = NewDrawBuffer(w, h)
-}
-
-func (v *BufferView) Cursor() Cursor {
-	return v.cursor
 }
 
 func (v *BufferView) CursorAdvance(x, y int) {
@@ -131,24 +128,32 @@ func (v *BufferView) CursorAdvance(x, y int) {
 			cx = 0
 		}
 
-		v.cursor.X = cx + x
+		v.CursorSetX(cx + x)
 	}
 
 	if cy+y < 0 {
-		v.cursor.Y = 0
+		v.CursorSetY(0)
 	} else if cy+y > lc-1 {
-		v.cursor.Y = lc - 1
+		v.CursorSetY(lc - 1)
 	} else {
-		v.cursor.Y = cy + y
+		v.CursorSetY(cy + y)
 	}
 }
 
+func (v *BufferView) CursorX() int {
+	return v.state.MustGet("cursor.x").(int)
+}
+
+func (v *BufferView) CursorY() int {
+	return v.state.MustGet("cursor.y").(int)
+}
+
 func (v *BufferView) CursorSetX(x int) {
-	v.cursor.X = x
+	v.state.Set("cursor.x", x)
 }
 
 func (v *BufferView) CursorSetY(y int) {
-	v.cursor.Y = y
+	v.state.Set("cursor.y", y)
 }
 
 func (v *BufferView) CursorOffset() int {
@@ -182,17 +187,25 @@ func (v *BufferView) DeleteBack(n int) {
 		n = cp
 	}
 	v.buffer.Delete(cp-n, n)
-	v.cursor.X, v.cursor.Y = v.OffsetToCursor(cp - n)
-	fmt.Println(v.cursor)
+	ox, oy := v.OffsetToCursor(cp - n)
+	v.CursorSetX(ox)
+	v.CursorSetY(oy)
 }
 
 func (v *BufferView) cursorReal() (int, int) {
-	x := v.cursor.X
+	x := v.CursorX()
+	y := v.CursorY()
 
-	ln := v.buffer.LineLength(v.cursor.Y)
-	if v.cursor.X > ln {
+	ln := v.buffer.LineLength(y)
+	if x > ln {
 		x = ln
 	}
 
-	return x, v.cursor.Y
+	return x, y
+}
+
+func (v *BufferView) Attach(s *state.State) {
+	v.state = s
+	s.Set("cursor.x", 0)
+	s.Set("cursor.y", 0)
 }

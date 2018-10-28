@@ -20,7 +20,7 @@ type Drawer interface {
 }
 
 type Renderable interface {
-	Render(Drawer)
+	Render(d Drawer, w, h int)
 	HandleKeyPress(k keymap.KeyPress)
 }
 
@@ -76,7 +76,8 @@ func (r *Renderer) Run(drawable Renderable) {
 			drawable.HandleKeyPress(*kp)
 		}
 		r.win.Clear(colornames.Ivory)
-		drawable.Render(r)
+		size := r.win.Bounds()
+		drawable.Render(r, int(size.W()/r.blockW), int(size.H()/r.blockH))
 		r.win.Update()
 		<-fps
 	}
