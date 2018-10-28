@@ -1,6 +1,8 @@
 package window
 
 import (
+	log "github.com/sirupsen/logrus"
+
 	"github.com/aestek/baleno/keymap"
 	"github.com/aestek/baleno/render"
 	"github.com/aestek/baleno/state"
@@ -19,17 +21,19 @@ func New(state *state.State) *Window {
 	state.Set("window.panes.root.sizing", CompSizing(RatioSideSizing(1), RatioSideSizing(1)))
 	state.Set("window.panes.root.split_dir", PaneSplitHorizontal)
 	state.Set("window.panes.root.view", nil)
-	state.Alias("window.panes.focused", "window.panes.root")
+	err := state.Alias("window.panes.focused", "window.panes.root")
+	if err != nil {
+		panic(err)
+	}
 
 	return w
 }
 
 func (w *Window) AddView(v view.View) {
-	v.Attach(w.state.Namespace("window.panes.focused.view"))
-
 	paneView, _ := w.state.Get("window.panes.focused.view")
 
 	if paneView == nil {
+		v.Attach(w.state.Namespace("window.panes.focused.view"))
 		w.state.Set("window.panes.focused.view", v)
 		return
 	}
@@ -44,12 +48,17 @@ func (w *Window) AddView(v view.View) {
 
 	w.paneIdx++
 	prefix = state.K("window.panes.focused.children", w.paneIdx)
+	v.Attach(w.state.Namespace(state.K(prefix, "view")))
 	w.state.Set(state.K(prefix, "view"), v)
 	w.state.Set(state.K(prefix, "split_dir"), paneSplitDir)
 	w.state.Set(state.K(prefix, "sizing"), HalfSizing(paneSplitDir))
 
 	w.state.Set("window.panes.focused.view", nil)
-	w.state.Alias("window.panes.focused", prefix)
+
+	err := w.state.Alias("window.panes.focused", prefix)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func (w *Window) HandleKeyPress(k keymap.KeyPress) {

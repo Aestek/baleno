@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"log"
 
 	"github.com/aestek/baleno/state"
 	"github.com/aestek/baleno/window"
@@ -11,10 +10,13 @@ import (
 	"github.com/aestek/baleno/render"
 	"github.com/aestek/baleno/view"
 	"github.com/faiface/pixel/pixelgl"
+	log "github.com/sirupsen/logrus"
 )
 
 func main() {
 	pixelgl.Run(func() {
+		log.SetLevel(log.DebugLevel)
+
 		state := state.New()
 
 		r := render.NewRenderer(

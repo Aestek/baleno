@@ -8,6 +8,7 @@ import (
 	"github.com/aestek/baleno/buffer"
 	"github.com/aestek/baleno/keymap"
 	"github.com/aestek/baleno/state"
+	log "github.com/sirupsen/logrus"
 )
 
 type StatusView struct {
@@ -29,14 +30,15 @@ func NewStatusView(infoState *state.State) *StatusView {
 
 	go func() {
 		for {
-			c := make(chan state.Event)
-			err := infoState.Watch("window.panes.focused.view.cursor.x", c)
+			c := make(chan state.Event, 10)
+			err := infoState.Watch("window.panes.focused.view.cursor", c)
 			if err != nil {
 				time.Sleep(time.Second)
 				continue
 			}
 
-			for _ = range c {
+			for e := range c {
+				log.Info(e)
 				v.infoCursorX = infoState.MustGet("window.panes.focused.view.cursor.x").(int)
 				v.infoCursorY = infoState.MustGet("window.panes.focused.view.cursor.y").(int)
 				v.draw()
@@ -67,14 +69,15 @@ func (v *StatusView) SetSize(w, h int) {
 
 func (v *StatusView) Attach(s *state.State) {
 	v.state = s
-
 }
 
 func (v *StatusView) HandleKeyPress(k keymap.KeyPress) {
 }
 
 func (v *StatusView) draw() {
-	line := fmt.Sprintf("C%d, L%d", v.infoCursorX, v.infoCursorY)
+	line := fmt.Sprintf("Ln %d, Col %d", v.infoCursorY+1, v.infoCursorX+1)
+
+	v.drawBuffer.Clear()
 	for i, r := range []rune(line) {
 		v.drawBuffer[0][i].Char = r
 	}

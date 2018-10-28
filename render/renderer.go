@@ -69,7 +69,7 @@ func NewRenderer(cfg Config) *Renderer {
 }
 
 func (r *Renderer) Run(drawable Renderable) {
-	fps := time.Tick(time.Second / 120)
+	fps := time.Tick(time.Second / 60)
 	for !r.win.Closed() {
 		kp := handleKeys(r.win)
 		if kp != nil {

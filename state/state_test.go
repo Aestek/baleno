@@ -97,3 +97,15 @@ func TestStateWatchAlias(t *testing.T) {
 	require.Equal(t, "a.b.d", evt.Key)
 	require.Equal(t, "lul", evt.Value)
 }
+
+func TestNamespace(t *testing.T) {
+	s := New()
+
+	s.Set("a.b.c", 42)
+
+	s2 := s.Namespace("a")
+	require.Equal(t, 42, s2.MustGet("b.c"))
+
+	s.Set("a.b.c", 43)
+	require.Equal(t, 43, s2.MustGet("b.c"))
+}

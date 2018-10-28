@@ -4,16 +4,9 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-)
 
-type Node struct {
-	Key      string
-	Alias    *Node
-	Aliased  []*Node
-	Value    interface{}
-	Watches  []chan Event
-	Children []*Node
-}
+	log "github.com/sirupsen/logrus"
+)
 
 type Event struct {
 	Key   string
@@ -52,12 +45,15 @@ Run:
 
 		if partIdx == len(parts)-1 {
 			n.Value = v
-			evt := Event{Key: k, Value: v}
+			name := n.Name()
+			log.Debugf("state: setting %s to %v", name, v)
+			evt := Event{Key: name, Value: v}
 			for _, n := range path {
 				for _, w := range n.Watches {
 					select {
 					case w <- evt:
 					default:
+						log.Warnf("state: dropped event for %s", name)
 					}
 				}
 			}
@@ -68,8 +64,10 @@ Run:
 			goto Run
 		}
 	}
+	log.Debugf("state: inserting empty node %s at %s", parts[partIdx], node.Name())
 	node.Children = append(node.Children, &Node{
-		Key: parts[partIdx],
+		Parent: node,
+		Key:    parts[partIdx],
 	})
 	goto Run
 }
@@ -103,6 +101,7 @@ Run:
 			goto Run
 		}
 	}
+	log.Debugf("state: get %s does not exist (found %s)", k, node.Name())
 	return nil
 }
 
@@ -159,6 +158,7 @@ func (s *State) Alias(from string, to string) error {
 				break
 			}
 		}
+		fromNode.Aliased = aliases
 	}
 
 	fromNode.Alias = toNode
@@ -171,11 +171,12 @@ func (s *State) Watch(k string, c chan Event) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	node := s.get(k, false)
+	node := s.get(k, true)
 	if node == nil {
 		return fmt.Errorf("state: watch: key `%s` does not exist", k)
 	}
 
+	log.Debugf("state: watching %s for change", node.Name())
 	node.Watches = append(node.Watches, c)
 	return nil
 }
@@ -189,5 +190,6 @@ func (s *State) Namespace(k string) *State {
 		node = s.set(k, nil)
 	}
 
+	log.Infof("state: namespacing at %s", node.Name())
 	return &State{root: node, lock: s.lock}
 }

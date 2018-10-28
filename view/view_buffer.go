@@ -1,8 +1,9 @@
 package view
 
 import (
-	"log"
 	"sync"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/aestek/baleno/buffer"
 	"github.com/aestek/baleno/keymap"
